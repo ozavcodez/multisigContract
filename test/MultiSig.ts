@@ -2,24 +2,24 @@ import {
     loadFixture,
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import hre from "hardhat";
-import { token } from "../typechain-types/@openzeppelin/contracts";
+import hre,  {ethers} from "hardhat";
+
 
 describe("MultiSig", function(){
 
-  async function deployToken() {
-    const [owner, addr1] = await hre.ethers.getSigners();
-
-    const Token = await hre.ethers.getContractFactory("Token");
-    const token = await Token.deploy();
-
-    return {token};
+  async function deployTokenX() {
+    const [owner, signer2, signer3, otherAccount] = await ethers.getSigners();
+    
+    const TokenX = await ethers.getContractFactory("TokenX");
+    const token = await TokenX.deploy();
+    
+    return { token, owner, signer2, signer3, otherAccount };
   }
 
   async function deployMultiSig(){
     const [owner, signer2, signer3, newAccount1] = await hre.ethers.getSigners();
 
-    const {token} = await loadFixture(deployToken);
+    const { token } = await loadFixture(deployTokenX);
 
     const quorum = 3;
     const validSigners = [signer2, signer3];
@@ -83,15 +83,66 @@ describe("MultiSig", function(){
       await expect(multiSig.transfer(amt,newAccount1,hre.ethers.ZeroAddress )).to.be.revertedWith("address zero found");
     });
 
-    it("Should revert if amount is less than balance", async function (){
+    it("Should revert if token address balance is less than amount", async function () {
+      
+      const { multiSig, signer2, signer3, token} = await loadFixture(deployMultiSig);
+      const amountToTransfer = hre.ethers.parseUnits("200", 18);
+    
+      await token.transfer(multiSig, amountToTransfer);
+      expect(await token.balanceOf(multiSig)).to.be.equal(amountToTransfer);
 
-      const {multiSig, newAccount1, token} = await loadFixture(deployMultiSig);
+      const balanceAfterDeposit = await token.balanceOf(multiSig);
+      console.log(balanceAfterDeposit);
+
+
+      await token.approve(multiSig, amountToTransfer);
+
+      const amt = hre.ethers.parseUnits("200", 18);
+
+      expect(await multiSig.transfer(amt, signer2.address, token)).to.be.revertedWith("insufficient funds");
 
       
+    });
+
+    it("Should increase txCount After transaction", async function () {
+      
+      const { multiSig, signer2, token} = await loadFixture(deployMultiSig);
+      const amountToTransfer = hre.ethers.parseUnits("500", 18);
+    
+      await token.transfer(multiSig, amountToTransfer);
+      await token.approve(multiSig, amountToTransfer);
 
       const amt = hre.ethers.parseUnits("10", 18);
+      await multiSig.transfer(amt, signer2, token);
+      // console.log(multiSig);
+      
 
-      await expect(multiSig.transfer(amt,newAccount1,token)).to.be.revertedWith("insufficient funds"); 
+      expect(await multiSig.txCount()).to.be.equal(1);
+
+    });
+  });
+
+  describe("ApproveTx", function (){
+
+    it("should approve transaction when the quorum is reached", async function () {
+      const { multiSig, signer2, signer3, token} = await loadFixture(deployMultiSig);
+
+      const amountToTransfer = hre.ethers.parseUnits("500", 18);
+    
+      await token.transfer(multiSig, amountToTransfer);
+      await token.approve(multiSig, amountToTransfer);
+
+      const amt = hre.ethers.parseUnits("10", 18);
+      await multiSig.transfer(amt, signer2, token);
+     
+      const txId = 1;
+
+      await multiSig.connect(signer2).approveTx(txId)
+
+      // let trx = await multiSig.(txId)
+
+
+      expect(multiSig.approveTx(txId) )
     });
   });
 });

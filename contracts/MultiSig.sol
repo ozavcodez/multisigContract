@@ -96,12 +96,6 @@ contract MultiSig {
         require(!trx.isCompleted, "transaction already completed");
         require(trx.noOfApproval < quorum, "approvals already reached");
 
-        // for(uint256 i = 0; i < trx.transactionSigners.length; i++) {
-        //     if(trx.transactionSigners[i] == msg.sender) {
-        //         revert("can't sign twice");
-        //     }
-        // }
-
         require(isValidSigner[msg.sender], "not a valid signer");
         require(!hasSigned[msg.sender][_txId], "can't sign twice");
 
@@ -138,6 +132,11 @@ contract MultiSig {
         
         quorum = trx.newQuorum;
     }
+    
+    function getTransaction(uint8 _txId) public view returns (Transaction memory) {
+        return transactions[_txId];
+    }
+
 
    
 }
